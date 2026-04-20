@@ -1,0 +1,2157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neural Function Viewer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f5f4f0;
+    --panel: #ffffff;
+    --border: #e0ddd6;
+    --text: #1a1a1a;
+    --dim: #999990;
+    --accent: #2563eb;
+    --green: #16a34a;
+    --red: #dc2626;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    height: 100vh;
+    display: grid;
+    grid-template-columns: 290px 1fr;
+    grid-template-rows: 100vh;
+    overflow: hidden;
+  }
+
+  /* ─── LEFT PANEL ─── */
+  .controls {
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  .controls-header {
+    padding: 12px 16px 10px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .controls-header h1 {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.07em;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+  .controls-header p {
+    font-size: 10px;
+    color: var(--dim);
+    margin-top: 2px;
+    font-family: var(--mono);
+  }
+
+  .net-diagram-wrap {
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  #netDiagram { display: block; width: 100%; }
+
+  .controls-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 16px;
+    min-height: 0;
+  }
+
+  .section { margin-bottom: 18px; }
+
+  .section-title {
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .arch-display {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--dim);
+    margin-bottom: 8px;
+  }
+  .arch-display span { color: var(--text); font-weight: 500; }
+
+  .layer-list { display: flex; flex-direction: column; gap: 5px; margin-bottom: 8px; }
+
+  .layer-row {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 8px;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 5px;
+  }
+  .layer-name { font-family: var(--mono); font-size: 9px; color: var(--dim); flex: 1; }
+  .layer-name span { color: var(--text); font-weight: 500; }
+
+  .neuron-ctrl { display: flex; align-items: center; gap: 3px; }
+  .neuron-count { font-family: var(--mono); font-size: 11px; font-weight: 500; min-width: 18px; text-align: center; color: var(--accent); }
+
+  .sm-btn {
+    width: 20px; height: 20px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 3px;
+    cursor: pointer; font-size: 13px; color: var(--text);
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color .12s, color .12s;
+    font-family: var(--mono); line-height: 1;
+  }
+  .sm-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .del-btn {
+    width: 18px; height: 18px; background: none; border: none; cursor: pointer;
+    color: #ccc; font-size: 14px; display: flex; align-items: center; justify-content: center;
+    transition: color .12s; padding: 0;
+  }
+  .del-btn:hover { color: #e44; }
+
+  .add-layer-btn {
+    width: 100%; padding: 6px; background: none;
+    border: 1px dashed var(--border); border-radius: 5px; cursor: pointer;
+    font-family: var(--mono); font-size: 10px; color: var(--dim);
+    transition: border-color .12s, color .12s; letter-spacing: .04em;
+  }
+  .add-layer-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Sliders */
+  .weight-group { margin-bottom: 10px; }
+  .weight-group-title { font-family: var(--mono); font-size: 9px; color: var(--dim); margin-bottom: 4px; }
+  .weight-item { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  .weight-name { font-family: var(--mono); font-size: 9px; color: var(--dim); min-width: 52px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .weight-slider-wrap { flex: 1; }
+
+  input[type=range] {
+    -webkit-appearance: none; width: 100%; height: 2px;
+    background: var(--border); border-radius: 1px; outline: none; cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 11px; height: 11px;
+    background: var(--accent); border-radius: 50%;
+    border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,.2);
+  }
+  .weight-val { font-family: var(--mono); font-size: 9px; min-width: 30px; text-align: right; color: var(--text); }
+
+  /* Selects */
+  .select-row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+  .select-row label { font-family: var(--mono); font-size: 10px; color: var(--dim); min-width: 72px; }
+
+  select {
+    flex: 1; background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); font-family: var(--mono); font-size: 10px;
+    padding: 3px 6px; border-radius: 4px; cursor: pointer; outline: none;
+  }
+  select:focus { border-color: var(--accent); }
+
+  /* Toggle button */
+  .tog-btn {
+    flex: 1; padding: 3px 6px;
+    background: transparent; border: 1px solid var(--accent); border-radius: 4px;
+    cursor: pointer; font-family: var(--mono); font-size: 10px; color: var(--accent);
+    transition: background .12s, color .12s, border-color .12s;
+  }
+  .tog-btn.off { background: var(--bg); color: var(--dim); border-color: var(--border); }
+
+  /* Training section */
+  .train-row { display: flex; gap: 6px; align-items: center; margin-bottom: 7px; }
+
+  .action-btn {
+    flex: 1; padding: 6px 0;
+    background: var(--accent); border: none; border-radius: 5px;
+    color: white; font-family: var(--mono); font-size: 10px; letter-spacing: .04em;
+    cursor: pointer; transition: background .12s;
+  }
+  .action-btn:hover { background: #1d4ed8; }
+  .action-btn.secondary { background: transparent; border: 1px solid var(--border); color: var(--dim); }
+  .action-btn.secondary:hover { border-color: var(--accent); color: var(--accent); background: transparent; }
+  .action-btn.danger { background: transparent; border: 1px solid var(--border); color: var(--dim); }
+  .action-btn.danger:hover { border-color: var(--red); color: var(--red); background: transparent; }
+
+  .train-stat {
+    font-family: var(--mono); font-size: 9px; color: var(--dim);
+    margin-bottom: 4px;
+    display: flex; justify-content: space-between;
+  }
+  .train-stat span { color: var(--text); }
+
+  /* Image upload */
+  .upload-area {
+    border: 1px dashed var(--border); border-radius: 6px;
+    padding: 10px; text-align: center; cursor: pointer;
+    transition: border-color .12s, background .12s;
+    margin-bottom: 8px;
+    position: relative;
+  }
+  .upload-area:hover { border-color: var(--accent); background: rgba(37,99,235,.03); }
+  .upload-area input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .upload-area p { font-family: var(--mono); font-size: 10px; color: var(--dim); pointer-events: none; }
+  .upload-area .upload-icon { font-size: 18px; margin-bottom: 4px; }
+
+  #imgPreview {
+    width: 100%; border-radius: 4px; border: 1px solid var(--border);
+    display: none; margin-bottom: 8px;
+    image-rendering: pixelated;
+  }
+
+  .loss-bar-wrap {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+    height: 6px; margin-top: 4px; overflow: hidden;
+  }
+  #lossBar {
+    height: 100%; background: var(--accent);
+    width: 0%; transition: width .2s, background .2s;
+    border-radius: 4px;
+  }
+
+  /* ─── RIGHT PANEL ─── */
+  .viz-area {
+    display: flex; flex-direction: column;
+    overflow: hidden; background: var(--bg); min-height: 0;
+  }
+
+  /* View tabs */
+  .view-tabs {
+    display: flex; flex-shrink: 0;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+  }
+  .view-tab {
+    flex: 1; padding: 8px 0;
+    background: none; border: none; border-bottom: 2px solid transparent;
+    font-family: var(--mono); font-size: 10px; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--dim);
+    cursor: pointer; transition: color .12s, border-color .12s;
+  }
+  .view-tab:hover { color: var(--text); }
+  .view-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* Function view: 2 panels side by side */
+  #viewFunction {
+    flex: 1; display: grid; grid-template-columns: 1fr 1fr;
+    overflow: hidden; min-height: 0;
+  }
+  #viewFunction .viz-panel:first-child { border-right: 1px solid var(--border); }
+
+  /* Neurons view */
+  #viewNeurons {
+    flex: 1; overflow-y: auto; overflow-x: hidden;
+    padding: 12px 16px;
+  }
+  .neuron-row {
+    display: flex; align-items: flex-start; gap: 10px;
+    margin-bottom: 14px;
+  }
+  .layer-label {
+    font-family: var(--mono); font-size: 9px; color: var(--dim);
+    min-width: 56px; padding-top: 4px; text-align: right;
+    flex-shrink: 0; letter-spacing: .04em;
+  }
+  .neuron-thumbs { display: flex; flex-wrap: wrap; gap: 6px; }
+  .neuron-thumb {
+    position: relative; cursor: pointer;
+    border-radius: 4px; overflow: hidden;
+    border: 1.5px solid transparent;
+    transition: border-color .1s, transform .1s;
+    line-height: 0;
+  }
+  .neuron-thumb:hover { border-color: #f59e0b; transform: scale(1.06); z-index: 1; }
+  .neuron-thumb canvas { display: block; width: 56px; height: 56px; image-rendering: pixelated; }
+  .neuron-thumb .thumb-label {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: rgba(0,0,0,.45); color: white;
+    font-family: var(--mono); font-size: 7px; text-align: center;
+    padding: 1px 0; pointer-events: none;
+  }
+
+  .viz-panel { position: relative; overflow: hidden; min-height: 0; }
+  .viz-label {
+    position: absolute; top: 10px; left: 14px;
+    font-family: var(--mono); font-size: 9px; font-weight: 500;
+    color: rgba(0,0,0,.35); letter-spacing: .1em; text-transform: uppercase;
+    z-index: 2; pointer-events: none;
+  }
+  canvas.viz-canvas { display: block; width: 100%; height: 100%; }
+
+  .colorbar {
+    position: absolute; right: 12px; top: 32px; width: 12px; bottom: 12px;
+    z-index: 2; display: flex; align-items: stretch;
+  }
+  .colorbar-gradient { width: 12px; border-radius: 3px; border: 1px solid rgba(0,0,0,.1); flex-shrink: 0; }
+  .colorbar-ticks {
+    position: absolute; left: 16px; top: 0; bottom: 0;
+    display: flex; flex-direction: column; justify-content: space-between;
+    font-family: var(--mono); font-size: 8px; color: rgba(0,0,0,.4); white-space: nowrap;
+  }
+
+  /* Neuron modal */
+  #neuronModal {
+    display: none; position: fixed; inset: 0; z-index: 100;
+    background: rgba(0,0,0,.6); backdrop-filter: blur(3px);
+    align-items: center; justify-content: center;
+  }
+  #neuronModal.open { display: flex; }
+  #neuronModalBox {
+    background: var(--panel); border-radius: 10px;
+    padding: 20px; box-shadow: 0 20px 60px rgba(0,0,0,.4);
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    max-width: 90vmin; max-height: 90vmin;
+  }
+  #neuronModalTitle {
+    font-family: var(--mono); font-size: 11px; color: var(--dim);
+    letter-spacing: .08em; text-transform: uppercase;
+  }
+  #neuronModalCanvas { border-radius: 6px; image-rendering: pixelated; }
+  #neuronModalClose {
+    position: absolute; top: 12px; right: 16px;
+    background: none; border: none; font-size: 22px; cursor: pointer;
+    color: var(--dim); line-height: 1;
+  }
+  #neuronModalClose:hover { color: var(--text); }
+
+  ::-webkit-scrollbar { width: 3px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- LEFT -->
+<div class="controls">
+  <div class="controls-header">
+    <h1>Neural Function Viewer</h1>
+    <p>f : ℝ² → ℝ</p>
+  </div>
+
+  <div class="net-diagram-wrap">
+    <canvas id="netDiagram" height="100"></canvas>
+  </div>
+
+  <div class="controls-body">
+
+    <div class="section">
+      <div class="section-title">Architecture</div>
+      <div class="arch-display" id="archDisplay"></div>
+      <div class="layer-list" id="layerList"></div>
+      <button class="add-layer-btn" id="addLayerBtn">+ Add Hidden Layer</button>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Settings</div>
+      <div class="select-row">
+        <label>Activation</label>
+        <select id="activationSel">
+          <option value="tanh">tanh</option>
+          <option value="relu">relu</option>
+          <option value="sigmoid">sigmoid</option>
+          <option value="sin">sin</option>
+          <option value="linear">linear</option>
+          <option value="custom">custom…</option>
+        </select>
+      </div>
+      <div id="customActRow" style="display:none;margin-bottom:7px;">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-bottom:4px;">σ(x) =</div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <input type="text" id="customActInput" value="tanh(x)"
+            placeholder="e.g. max(0,x)"
+            style="flex:1;font-family:var(--mono);font-size:11px;padding:4px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);outline:none;">
+          <button id="applyActBtn" style="padding:4px 8px;font-family:var(--mono);font-size:9px;background:var(--accent);color:white;border:none;border-radius:4px;cursor:pointer;">Apply</button>
+        </div>
+        <div id="customActError" style="font-family:var(--mono);font-size:9px;color:#dc2626;margin-top:3px;display:none;"></div>
+      </div>
+      <div class="select-row">
+        <label>Colormap</label>
+        <select id="colormapSel">
+          <option value="viridis">Viridis</option>
+          <option value="plasma">Plasma</option>
+          <option value="coolwarm">Coolwarm</option>
+          <option value="grayscale">Grayscale</option>
+        </select>
+      </div>
+      <div class="select-row">
+        <label>Neurons cm</label>
+        <select id="neuronColormapSel">
+          <option value="coolwarm" selected>Coolwarm</option>
+          <option value="viridis">Viridis</option>
+          <option value="plasma">Plasma</option>
+          <option value="grayscale">Grayscale</option>
+        </select>
+      </div>
+      <div class="select-row">
+        <label>Network</label>
+        <button id="showNetBtn" class="tog-btn">Show</button>
+      </div>
+      <div class="select-row">
+        <label>Image</label>
+        <button id="showImgBtn" class="tog-btn off">Show</button>
+      </div>
+      <div class="select-row">
+        <label>XOR pts</label>
+        <button id="xorToggleBtn" class="tog-btn off">Show</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Image Target</div>
+      <div class="upload-area">
+        <input type="file" id="imgUpload" accept="image/*">
+        <div class="upload-icon">🖼</div>
+        <p id="uploadLabel">Click or drop image</p>
+      </div>
+      <img id="imgPreview" alt="preview">
+    </div>
+
+    <div class="section">
+      <div class="section-title">Training</div>
+      <div class="select-row">
+        <label>Target</label>
+        <select id="trainTargetSel">
+          <option value="xor">XOR function</option>
+          <option value="image">Uploaded image</option>
+        </select>
+      </div>
+      <div class="select-row">
+        <label>Optimizer</label>
+        <select id="optimSel">
+          <option value="adam" selected>Adam</option>
+          <option value="sgd">SGD</option>
+        </select>
+      </div>
+      <div class="select-row">
+        <label>LR</label>
+        <select id="lrSel">
+          <option value="0.01">0.01</option>
+          <option value="0.003" selected>0.003</option>
+          <option value="0.001">0.001</option>
+          <option value="0.0003">0.0003</option>
+          <option value="0.0001">0.0001</option>
+        </select>
+      </div>
+      <div class="select-row">
+        <label>Batch</label>
+        <select id="batchSel">
+          <option value="full">Full</option>
+          <option value="512">512</option>
+          <option value="256" selected>256</option>
+          <option value="64">64</option>
+        </select>
+      </div>
+      <div class="train-stat">Epoch <span id="epochSpan">0</span> &nbsp; <span id="stepsSecSpan" style="color:var(--dim);font-size:8px"></span></div>
+      <div class="train-stat">Loss <span id="lossSpan">—</span> &nbsp; Best <span id="bestLossSpan">—</span></div>
+      <canvas id="lossChart" height="36" style="width:100%;border-radius:4px;background:var(--bg);border:1px solid var(--border);display:block;margin-bottom:6px;margin-top:4px;"></canvas>
+      <div class="train-row">
+        <button class="action-btn" id="trainBtn">▶ Train</button>
+        <button class="action-btn secondary" id="stepBtn">Step</button>
+        <button class="action-btn danger" id="resetTrainBtn">Reset</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Evaluate f(x, y)</div>
+      <div class="select-row">
+        <label>Show</label>
+        <button id="showEvalBtn" class="tog-btn off">Show</button>
+      </div>
+      <div class="select-row">
+        <label>x</label>
+        <input type="number" id="evalX" value="0" step="0.1"
+          style="flex:1;font-family:var(--mono);font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);outline:none;">
+      </div>
+      <div class="select-row">
+        <label>y</label>
+        <input type="number" id="evalY" value="0" step="0.1"
+          style="flex:1;font-family:var(--mono);font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);outline:none;">
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px;">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--dim);">f(x, y) =</span>
+        <span id="evalResult" style="font-family:var(--mono);font-size:13px;font-weight:500;color:var(--accent);">—</span>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Weights &amp; Biases</div>
+      <div id="weightSliders"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="viz-area" id="vizArea">
+  <div class="view-tabs">
+    <button class="view-tab active" id="tabFunction">f(x,y)</button>
+    <button class="view-tab" id="tabNeurons">Neurons</button>
+  </div>
+
+  <div id="viewFunction">
+    <div class="viz-panel">
+      <div class="viz-label">Colormap — f(x, y)</div>
+      <canvas class="viz-canvas" id="cmapCanvas"></canvas>
+      <div class="colorbar">
+        <canvas class="colorbar-gradient" id="colorbarCanvas" width="12" height="200"></canvas>
+        <div class="colorbar-ticks">
+          <span id="cbMax"></span>
+          <span id="cbMid"></span>
+          <span id="cbMin"></span>
+        </div>
+      </div>
+    </div>
+    <div class="viz-panel">
+      <div class="viz-label">Surface — scroll to zoom · drag to rotate</div>
+      <canvas class="viz-canvas" id="surfCanvas"></canvas>
+    </div>
+  </div>
+
+  <div id="viewNeurons" style="display:none">
+    <div id="neuronsGrid"></div>
+  </div>
+</div>
+
+<!-- Neuron modal -->
+<div id="neuronModal">
+  <div id="neuronModalBox" style="position:relative">
+    <button id="neuronModalClose">×</button>
+    <div id="neuronModalTitle">—</div>
+    <canvas id="neuronModalCanvas" width="360" height="360"></canvas>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════════════
+const RANGE = 3;
+const GRID  = 80;
+const N     = GRID + 1;
+
+// ═══════════════════════════════════════════════════════════════
+// NETWORK
+// ═══════════════════════════════════════════════════════════════
+const net = {
+  layers: [4, 4],
+  activation: 'tanh',
+  weights: [],
+  biases: [],
+};
+
+function archSizes() { return [2, ...net.layers, 1]; }
+
+// ── Custom activation ──
+let customActFn   = null;  // compiled function or null
+let customActName = '';    // the formula string
+
+function compileCustomAct(formula) {
+  // Expose Math functions directly so user can write sin(x), max(0,x), etc.
+  const mathNames = Object.getOwnPropertyNames(Math);
+  const mathVals  = mathNames.map(k => Math[k]);
+  try {
+    const fn = new Function(...mathNames, 'x', `"use strict"; return (${formula});`);
+    // Validate: must return a finite number for a test input
+    const test = fn(...mathVals, 0.5);
+    if (typeof test !== 'number' || !isFinite(test)) throw new Error('Non-finite result');
+    customActFn   = v => fn(...mathVals, v);
+    customActName = formula;
+    return null; // no error
+  } catch(e) {
+    return e.message;
+  }
+}
+
+function activate(v) {
+  if (net.activation === 'custom' && customActFn) return customActFn(v);
+  switch (net.activation) {
+    case 'relu':    return v > 0 ? v : 0;
+    case 'tanh':    return Math.tanh(v);
+    case 'sigmoid': return 1 / (1 + Math.exp(-v));
+    case 'sin':     return Math.sin(v);
+    default:        return v;
+  }
+}
+
+function activateDeriv(v) {
+  if (net.activation === 'custom' && customActFn) {
+    // Numerical differentiation (central difference)
+    const h = 1e-4;
+    return (customActFn(v + h) - customActFn(v - h)) / (2 * h);
+  }
+  switch (net.activation) {
+    case 'relu':    return v > 0 ? 1 : 0;
+    case 'tanh':    { const t = Math.tanh(v); return 1 - t * t; }
+    case 'sigmoid': { const s = 1 / (1 + Math.exp(-v)); return s * (1 - s); }
+    case 'sin':     return Math.cos(v);
+    default:        return 1;
+  }
+}
+
+function forward(x, y) {
+  let a = [x, y];
+  const L = net.weights.length;
+  for (let l = 0; l < L; l++) {
+    const W = net.weights[l], B = net.biases[l];
+    const isLast = l === L - 1;
+    const next = new Array(W.length);
+    for (let j = 0; j < W.length; j++) {
+      let z = B[j];
+      const row = W[j];
+      for (let k = 0; k < row.length; k++) z += row[k] * a[k];
+      next[j] = isLast ? z : activate(z);
+    }
+    a = next;
+  }
+  return a[0];
+}
+
+// Full forward pass keeping all intermediates (for backprop)
+function forwardFull(input) {
+  const activations = [input.slice()];
+  const zs = [];
+  const L = net.weights.length;
+  let a = input.slice();
+  for (let l = 0; l < L; l++) {
+    const W = net.weights[l], B = net.biases[l];
+    const isLast = l === L - 1;
+    const z = new Array(W.length);
+    const nextA = new Array(W.length);
+    for (let j = 0; j < W.length; j++) {
+      let s = B[j];
+      for (let k = 0; k < W[j].length; k++) s += W[j][k] * a[k];
+      z[j] = s;
+      nextA[j] = isLast ? s : activate(s);
+    }
+    zs.push(z);
+    activations.push(nextA);
+    a = nextA;
+  }
+  return { activations, zs, output: a[0] };
+}
+
+function initWeights() {
+  const a = archSizes();
+  net.weights = [];
+  net.biases  = [];
+  for (let l = 0; l < a.length - 1; l++) {
+    const fanIn = a[l], fanOut = a[l + 1];
+    const scale = Math.sqrt(2 / fanIn);
+    net.weights.push(
+      Array.from({ length: fanOut }, () =>
+        Array.from({ length: fanIn }, () => (Math.random() * 2 - 1) * scale)
+      )
+    );
+    net.biases.push(new Array(fanOut).fill(0));
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// GRID CACHE
+// ═══════════════════════════════════════════════════════════════
+let gridVals = new Float32Array(N * N);
+let gridNorm = new Float32Array(N * N);
+let quadNorm = new Float32Array(GRID * GRID);
+let gridMin = 0, gridMax = 1;
+
+function computeGrid() {
+  let mn = Infinity, mx = -Infinity;
+  for (let iy = 0; iy < N; iy++) {
+    const y = (iy / GRID) * (RANGE * 2) - RANGE;
+    for (let ix = 0; ix < N; ix++) {
+      const x = (ix / GRID) * (RANGE * 2) - RANGE;
+      const v = forward(x, y);
+      gridVals[iy * N + ix] = v;
+      if (v < mn) mn = v;
+      if (v > mx) mx = v;
+    }
+  }
+  gridMin = mn; gridMax = mx;
+  const span = mx - mn || 1e-9;
+  for (let i = 0; i < N * N; i++) gridNorm[i] = (gridVals[i] - mn) / span;
+  for (let iy = 0; iy < GRID; iy++) {
+    for (let ix = 0; ix < GRID; ix++) {
+      quadNorm[iy * GRID + ix] = (
+        gridNorm[ iy      * N + ix    ] +
+        gridNorm[ iy      * N + ix + 1] +
+        gridNorm[(iy + 1) * N + ix    ] +
+        gridNorm[(iy + 1) * N + ix + 1]
+      ) * 0.25;
+    }
+  }
+  neuronGridsDirty = true;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// NEURON ACTIVATION GRIDS
+// ═══════════════════════════════════════════════════════════════
+let neuronGrids      = [];    // [layerIdx][neuronIdx] = Float32Array(N*N)
+let neuronGridsDirty = true;
+let hoveredNeuron    = null;  // {l, j} or null
+let activeView       = 'function'; // 'function' | 'neurons'
+
+function computeNeuronGrids() {
+  const a = archSizes();
+  const L = a.length;
+
+  // (Re)allocate storage
+  neuronGrids = a.map(size => Array.from({ length: size }, () => new Float32Array(N * N)));
+
+  for (let iy = 0; iy < N; iy++) {
+    const y = (iy / GRID) * (RANGE * 2) - RANGE;
+    for (let ix = 0; ix < N; ix++) {
+      const x   = (ix / GRID) * (RANGE * 2) - RANGE;
+      const idx = iy * N + ix;
+
+      // Input layer
+      neuronGrids[0][0][idx] = x;
+      neuronGrids[0][1][idx] = y;
+
+      // Hidden + output layers via forwardFull
+      const { activations } = forwardFull([x, y]);
+      for (let l = 1; l < L; l++) {
+        for (let j = 0; j < a[l]; j++) {
+          neuronGrids[l][j][idx] = activations[l][j];
+        }
+      }
+    }
+  }
+  neuronGridsDirty = false;
+}
+
+// Render one neuron's activation into a canvas.
+// Uses coolwarm (diverging, centred at 0) for hidden neurons;
+// the selected colormap for input and output.
+function renderNeuronToCanvas(canvas, l, j, size) {
+  canvas.width  = N;
+  canvas.height = N;
+  const ctx  = canvas.getContext('2d');
+  const data = neuronGrids[l][j];
+  const a    = archSizes();
+  const isIO = (l === 0 || l === a.length - 1);
+  const lut  = getLUT(isIO
+    ? document.getElementById('colormapSel').value
+    : document.getElementById('neuronColormapSel').value);
+
+  // Normalise
+  let mn = Infinity, mx = -Infinity;
+  for (let i = 0; i < N * N; i++) {
+    if (data[i] < mn) mn = data[i];
+    if (data[i] > mx) mx = data[i];
+  }
+
+  const imgData = ctx.createImageData(N, N);
+  const buf = imgData.data;
+  for (let iy = 0; iy < N; iy++) {
+    for (let ix = 0; ix < N; ix++) {
+      const v    = data[(N - 1 - iy) * N + ix]; // flip Y so +y is up
+      let t;
+      if (isIO) {
+        t = (v - mn) / (mx - mn || 1e-9);
+      } else {
+        // Diverging: centre at 0, ±abs-max → [0,1]
+        const absMax = Math.max(Math.abs(mn), Math.abs(mx), 1e-9);
+        t = v / (2 * absMax) + 0.5;
+      }
+      const ci  = Math.round(Math.max(0, Math.min(1, t)) * 255) * 3;
+      const i4  = (iy * N + ix) * 4;
+      buf[i4]   = lut[ci]; buf[i4+1] = lut[ci+1]; buf[i4+2] = lut[ci+2]; buf[i4+3] = 255;
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
+
+// Build / refresh the entire neurons grid DOM
+let _neuronsViewArch = ''; // track if DOM needs full rebuild
+
+function renderNeuronsView() {
+  if (neuronGridsDirty) computeNeuronGrids();
+
+  const a     = archSizes();
+  const archKey = a.join(',');
+  const container = document.getElementById('neuronsGrid');
+  const names = ['Input', ...net.layers.map((_, i) => `H${i+1}`), 'Output'];
+  const nLabels = [['x','y'], ...net.layers.map((sz) => Array.from({length:sz},(_,j)=>`n${j}`)), ['f']];
+
+  // Rebuild DOM only if architecture changed
+  if (archKey !== _neuronsViewArch) {
+    _neuronsViewArch = archKey;
+    container.innerHTML = '';
+
+    a.forEach((size, l) => {
+      const row = document.createElement('div');
+      row.className = 'neuron-row';
+
+      const lbl = document.createElement('div');
+      lbl.className = 'layer-label';
+      lbl.textContent = names[l];
+      row.appendChild(lbl);
+
+      const thumbs = document.createElement('div');
+      thumbs.className = 'neuron-thumbs';
+
+      for (let j = 0; j < size; j++) {
+        const wrap = document.createElement('div');
+        wrap.className = 'neuron-thumb';
+        wrap.dataset.l = l; wrap.dataset.j = j;
+
+        const c = document.createElement('canvas');
+        c.width = 32; c.height = 32; // low-res thumbnail, CSS scales to 56px
+        c.dataset.l = l; c.dataset.j = j;
+        wrap.appendChild(c);
+
+        const lbEl = document.createElement('div');
+        lbEl.className = 'thumb-label';
+        lbEl.textContent = nLabels[l][j] ?? `n${j}`;
+        wrap.appendChild(lbEl);
+
+        wrap.addEventListener('mouseenter', () => {
+          hoveredNeuron = { l, j };
+          renderNetDiagram();
+        });
+        wrap.addEventListener('mouseleave', () => {
+          hoveredNeuron = null;
+          renderNetDiagram();
+        });
+        wrap.addEventListener('click', () => openNeuronModal(l, j, nLabels[l][j] ?? `n${j}`, names[l]));
+
+        thumbs.appendChild(wrap);
+      }
+
+      row.appendChild(thumbs);
+      container.appendChild(row);
+    });
+  }
+
+  // Always repaint every thumbnail canvas
+  container.querySelectorAll('canvas[data-l]').forEach(c => {
+    renderNeuronToCanvas(c, +c.dataset.l, +c.dataset.j, 32);
+  });
+}
+
+// ── Modal ──
+function openNeuronModal(l, j, neuronName, layerName) {
+  const modal   = document.getElementById('neuronModal');
+  const canvas  = document.getElementById('neuronModalCanvas');
+  const title   = document.getElementById('neuronModalTitle');
+  const size    = Math.min(window.innerWidth, window.innerHeight) * 0.72;
+  canvas.width  = Math.round(size);
+  canvas.height = Math.round(size);
+  canvas.style.width  = canvas.width  + 'px';
+  canvas.style.height = canvas.height + 'px';
+  title.textContent   = `${layerName} · ${neuronName}`;
+  renderNeuronToCanvas(canvas, l, j, Math.round(size));
+  modal.classList.add('open');
+}
+
+document.getElementById('neuronModalClose').addEventListener('click', () => {
+  document.getElementById('neuronModal').classList.remove('open');
+});
+document.getElementById('neuronModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('neuronModal'))
+    document.getElementById('neuronModal').classList.remove('open');
+});
+
+// ═══════════════════════════════════════════════════════════════
+// IMAGE TARGET — grayscale grid sampled at same N×N resolution
+// ═══════════════════════════════════════════════════════════════
+let imgGrid    = null;   // Float32Array(N*N), values in [0,1]
+let imgQuadNorm = null;  // Float32Array(GRID*GRID)
+
+function loadImageIntoGrid(imgEl) {
+  const offscreen = document.createElement('canvas');
+  offscreen.width  = N;
+  offscreen.height = N;
+  const ctx = offscreen.getContext('2d');
+  // Flip vertically so y=bottom matches grid convention
+  ctx.translate(0, N);
+  ctx.scale(1, -1);
+  ctx.drawImage(imgEl, 0, 0, N, N);
+  const px = ctx.getImageData(0, 0, N, N).data;
+
+  imgGrid = new Float32Array(N * N);
+  for (let i = 0; i < N * N; i++) {
+    // Grayscale: luminance
+    imgGrid[i] = (0.299 * px[i*4] + 0.587 * px[i*4+1] + 0.114 * px[i*4+2]) / 255;
+  }
+
+  imgQuadNorm = new Float32Array(GRID * GRID);
+  for (let iy = 0; iy < GRID; iy++) {
+    for (let ix = 0; ix < GRID; ix++) {
+      imgQuadNorm[iy * GRID + ix] = (
+        imgGrid[ iy      * N + ix    ] +
+        imgGrid[ iy      * N + ix + 1] +
+        imgGrid[(iy + 1) * N + ix    ] +
+        imgGrid[(iy + 1) * N + ix + 1]
+      ) * 0.25;
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// COLORMAPS
+// ═══════════════════════════════════════════════════════════════
+const LUTS = {};
+const VIRIDIS_KP = [[68,1,84],[71,44,122],[59,81,139],[44,113,142],[33,144,141],[39,173,129],[92,200,99],[170,220,50],[253,231,37]];
+const PLASMA_KP  = [[13,8,135],[84,2,163],[139,10,165],[185,50,137],[219,92,104],[244,136,73],[254,188,43],[240,249,33]];
+
+function interpKP(kp, t) {
+  t = Math.max(0, Math.min(1, t));
+  const s = t * (kp.length - 1);
+  const i = Math.min(Math.floor(s), kp.length - 2);
+  const f = s - i;
+  return [
+    Math.round(kp[i][0] + f * (kp[i+1][0] - kp[i][0])),
+    Math.round(kp[i][1] + f * (kp[i+1][1] - kp[i][1])),
+    Math.round(kp[i][2] + f * (kp[i+1][2] - kp[i][2])),
+  ];
+}
+
+function buildLUT(name) {
+  const lut = new Uint8Array(256 * 3);
+  for (let i = 0; i < 256; i++) {
+    const t = i / 255;
+    let r, g, b;
+    if      (name === 'viridis')  [r,g,b] = interpKP(VIRIDIS_KP, t);
+    else if (name === 'plasma')   [r,g,b] = interpKP(PLASMA_KP, t);
+    else if (name === 'coolwarm') {
+      if (t < 0.5) { const s=t*2; r=Math.round(60+s*176); g=Math.round(100+s*76); b=Math.round(220-s*20); }
+      else         { const s=(t-.5)*2; r=Math.round(236-s*36); g=Math.round(176-s*140); b=Math.round(200-s*164); }
+    } else { r=g=b=Math.round(t*255); }
+    lut[i*3]=r; lut[i*3+1]=g; lut[i*3+2]=b;
+  }
+  LUTS[name] = lut;
+  return lut;
+}
+function getLUT(name) { return LUTS[name] || buildLUT(name); }
+
+// ═══════════════════════════════════════════════════════════════
+// CANVASES
+// ═══════════════════════════════════════════════════════════════
+const cmapCanvas = document.getElementById('cmapCanvas');
+const surfCanvas = document.getElementById('surfCanvas');
+const cbarCanvas = document.getElementById('colorbarCanvas');
+const netDiagram = document.getElementById('netDiagram');
+const cmapCtx = cmapCanvas.getContext('2d');
+const surfCtx = surfCanvas.getContext('2d');
+const cbarCtx = cbarCanvas.getContext('2d');
+const netCtx  = netDiagram.getContext('2d');
+
+function resizeCanvases() {
+  [cmapCanvas, surfCanvas].forEach(c => {
+    const r = c.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0) { c.width = Math.round(r.width); c.height = Math.round(r.height); }
+  });
+  const nr = netDiagram.getBoundingClientRect();
+  if (nr.width > 0) netDiagram.width = Math.round(nr.width);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TOGGLE STATE
+// ═══════════════════════════════════════════════════════════════
+let showNet = true;
+let showImg = false;
+let showXOR = false;
+let showEval = false;
+
+// ═══════════════════════════════════════════════════════════════
+// EVAL STATE
+// ═══════════════════════════════════════════════════════════════
+let evalX = 0, evalY = 0;
+
+function updateEval() {
+  evalX = parseFloat(document.getElementById('evalX').value) || 0;
+  evalY = parseFloat(document.getElementById('evalY').value) || 0;
+  const result = forward(evalX, evalY);
+  document.getElementById('evalResult').textContent = result.toFixed(5);
+  scheduleRedraw(false);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// COLORMAP RENDER
+// ═══════════════════════════════════════════════════════════════
+const PAD = 36;
+
+function renderColormap() {
+  const W = cmapCanvas.width, H = cmapCanvas.height;
+  if (W === 0 || H === 0) return;
+  const cm  = document.getElementById('colormapSel').value;
+  const lut = getLUT(cm);
+
+  // Square plot: largest square that fits inside the padded area
+  const availW = W - PAD * 2;
+  const availH = H - PAD * 2;
+  const S = Math.min(availW, availH);   // plot side length
+
+  // Center the square within the canvas
+  const x0 = Math.floor((W - S) / 2);  // left edge of plot
+  const y0 = Math.floor((H - S) / 2);  // top edge of plot
+
+  cmapCtx.fillStyle = '#f5f4f0';
+  cmapCtx.fillRect(0, 0, W, H);
+
+  const hasNet = showNet;
+  const hasImg = showImg && imgGrid !== null;
+
+  if (hasNet || hasImg) {
+    const imgData = cmapCtx.createImageData(S, S);
+    const buf = imgData.data;
+
+    for (let py = 0; py < S; py++) {
+      const gy  = (1 - py / (S - 1)) * GRID;
+      const iy0 = Math.min(Math.floor(gy), GRID - 1);
+      const iy1 = iy0 + 1;
+      const fy  = gy - iy0;
+
+      for (let px = 0; px < S; px++) {
+        const gx  = (px / (S - 1)) * GRID;
+        const ix0 = Math.min(Math.floor(gx), GRID - 1);
+        const ix1 = ix0 + 1;
+        const fx  = gx - ix0;
+
+        const bilerp = (arr) =>
+          arr[iy0*N+ix0]*(1-fx)*(1-fy) + arr[iy0*N+ix1]*fx*(1-fy) +
+          arr[iy1*N+ix0]*(1-fx)*fy     + arr[iy1*N+ix1]*fx*fy;
+
+        let t = 0;
+        if (hasNet && hasImg)   t = (bilerp(gridNorm) + bilerp(imgGrid)) * 0.5;
+        else if (hasNet)        t = bilerp(gridNorm);
+        else                    t = bilerp(imgGrid);
+
+        const ci  = Math.round(Math.max(0, Math.min(1, t)) * 255) * 3;
+        const idx = (py * S + px) * 4;
+        buf[idx]=lut[ci]; buf[idx+1]=lut[ci+1]; buf[idx+2]=lut[ci+2]; buf[idx+3]=255;
+      }
+    }
+    cmapCtx.putImageData(imgData, x0, y0);
+  }
+
+  // Axes — anchored to the square plot edges
+  const axCol   = 'rgba(0,0,0,.55)';
+  const tickCol = 'rgba(0,0,0,.4)';
+  cmapCtx.strokeStyle = axCol; cmapCtx.lineWidth = 1;
+
+  // X axis along bottom edge of plot
+  cmapCtx.beginPath(); cmapCtx.moveTo(x0, y0+S); cmapCtx.lineTo(x0+S, y0+S); cmapCtx.stroke();
+  // Y axis along left edge of plot
+  cmapCtx.beginPath(); cmapCtx.moveTo(x0, y0);   cmapCtx.lineTo(x0,   y0+S); cmapCtx.stroke();
+
+  cmapCtx.font = '10px IBM Plex Mono'; cmapCtx.fillStyle = tickCol;
+  cmapCtx.textAlign = 'center';
+  for (let v = -RANGE; v <= RANGE; v++) {
+    const px2 = x0 + ((v + RANGE) / (RANGE * 2)) * S;
+    cmapCtx.beginPath(); cmapCtx.moveTo(px2, y0+S); cmapCtx.lineTo(px2, y0+S+5); cmapCtx.stroke();
+    cmapCtx.fillText(v, px2, y0+S+16);
+  }
+  cmapCtx.textAlign = 'right';
+  for (let v = -RANGE; v <= RANGE; v++) {
+    const py2 = y0 + S - ((v + RANGE) / (RANGE * 2)) * S;
+    cmapCtx.beginPath(); cmapCtx.moveTo(x0, py2); cmapCtx.lineTo(x0-5, py2); cmapCtx.stroke();
+    cmapCtx.fillText(v, x0-8, py2+3);
+  }
+
+  // Axis labels
+  cmapCtx.fillStyle = 'rgba(0,0,0,.55)';
+  cmapCtx.font = 'italic 12px IBM Plex Mono';
+  cmapCtx.textAlign = 'center';
+  cmapCtx.fillText('x', x0 + S/2, y0+S+30);
+  cmapCtx.save();
+  cmapCtx.translate(x0 - 28, y0 + S/2);
+  cmapCtx.rotate(-Math.PI/2);
+  cmapCtx.fillText('y', 0, 0);
+  cmapCtx.restore();
+
+  // ── XOR points on colormap ──
+  if (showXOR) {
+    for (const pt of XOR_PTS) {
+      // pt.wx, pt.wz are world coords in [-1,1]; data = world * RANGE
+      const dx = pt.wx * RANGE;  // data x
+      const dy = pt.wz * RANGE;  // data y
+      const px2 = x0 + ((dx + RANGE) / (RANGE * 2)) * S;
+      const py2 = y0 + S - ((dy + RANGE) / (RANGE * 2)) * S;
+      const col = pt.label === 1 ? '#2563eb' : '#dc2626';
+
+      cmapCtx.beginPath();
+      cmapCtx.arc(px2, py2, 6, 0, Math.PI * 2);
+      cmapCtx.fillStyle = col;
+      cmapCtx.fill();
+      cmapCtx.strokeStyle = 'white';
+      cmapCtx.lineWidth = 1.5;
+      cmapCtx.stroke();
+
+      cmapCtx.fillStyle = col;
+      cmapCtx.font = 'bold 9px IBM Plex Mono';
+      cmapCtx.textAlign = 'center';
+      cmapCtx.textBaseline = 'bottom';
+      cmapCtx.fillText(`(${dx.toFixed(0)},${dy.toFixed(0)})=${pt.label}`, px2, py2 - 8);
+    }
+  }
+
+  // ── Eval point crosshair ──
+  if (showEval && evalX >= -RANGE && evalX <= RANGE && evalY >= -RANGE && evalY <= RANGE) {
+    const epx = x0 + ((evalX + RANGE) / (RANGE * 2)) * S;
+    const epy = y0 + S - ((evalY + RANGE) / (RANGE * 2)) * S;
+
+    // Crosshair lines
+    cmapCtx.strokeStyle = 'rgba(255,255,255,0.7)';
+    cmapCtx.lineWidth = 1;
+    cmapCtx.setLineDash([3, 3]);
+    cmapCtx.beginPath(); cmapCtx.moveTo(x0, epy); cmapCtx.lineTo(x0 + S, epy); cmapCtx.stroke();
+    cmapCtx.beginPath(); cmapCtx.moveTo(epx, y0); cmapCtx.lineTo(epx, y0 + S); cmapCtx.stroke();
+    cmapCtx.setLineDash([]);
+
+    // Dot
+    cmapCtx.beginPath();
+    cmapCtx.arc(epx, epy, 5, 0, Math.PI * 2);
+    cmapCtx.fillStyle = 'white';
+    cmapCtx.fill();
+    cmapCtx.strokeStyle = 'rgba(0,0,0,0.7)';
+    cmapCtx.lineWidth = 1.5;
+    cmapCtx.stroke();
+
+    // Label
+    const res = forward(evalX, evalY);
+    cmapCtx.fillStyle = 'rgba(0,0,0,0.8)';
+    cmapCtx.font = 'bold 9px IBM Plex Mono';
+    cmapCtx.textAlign = epx > x0 + S * 0.7 ? 'right' : 'left';
+    cmapCtx.textBaseline = epy < y0 + S * 0.3 ? 'top' : 'bottom';
+    const tx = cmapCtx.textAlign === 'right' ? epx - 8 : epx + 8;
+    const ty = cmapCtx.textBaseline === 'top' ? epy + 8 : epy - 8;
+    cmapCtx.fillText(`f(${evalX.toFixed(2)}, ${evalY.toFixed(2)}) = ${res.toFixed(4)}`, tx, ty);
+  }
+
+  renderColorbar(cm);
+  document.getElementById('cbMax').textContent = gridMax.toFixed(2);
+  document.getElementById('cbMid').textContent = ((gridMax+gridMin)/2).toFixed(2);
+  document.getElementById('cbMin').textContent = gridMin.toFixed(2);
+}
+
+function renderColorbar(cm) {
+  const lut = getLUT(cm);
+  const H   = cbarCanvas.height;
+  const img = cbarCtx.createImageData(12, H);
+  for (let py = 0; py < H; py++) {
+    const ci = Math.round((1 - py/(H-1)) * 255) * 3;
+    for (let px = 0; px < 12; px++) {
+      const idx = (py*12+px)*4;
+      img.data[idx]=lut[ci]; img.data[idx+1]=lut[ci+1]; img.data[idx+2]=lut[ci+2]; img.data[idx+3]=255;
+    }
+  }
+  cbarCtx.putImageData(img, 0, 0);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SURFACE RENDER
+// ═══════════════════════════════════════════════════════════════
+let surfRotY = 0.55, surfRotX = 0.45, surfZoom = 1.0;
+let isDragging = false, lastMX = 0, lastMY = 0;
+let _cY, _sY, _cX, _sX;
+
+surfCanvas.addEventListener('mousedown', e => { isDragging=true; lastMX=e.clientX; lastMY=e.clientY; });
+window.addEventListener('mouseup', () => { isDragging=false; });
+window.addEventListener('mousemove', e => {
+  if (!isDragging) return;
+  surfRotY += (e.clientX - lastMX) * 0.007;
+  surfRotX  = Math.max(-0.05, Math.min(1.3, surfRotX + (e.clientY-lastMY)*0.007));
+  lastMX=e.clientX; lastMY=e.clientY;
+  renderSurface();
+});
+surfCanvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  surfZoom *= e.deltaY < 0 ? 1.08 : 0.93;
+  surfZoom  = Math.max(0.2, Math.min(5.0, surfZoom));
+  renderSurface();
+}, { passive: false });
+
+function project(wx, wy, wz, W, H, scale) {
+  const rx =  wx*_cY + wz*_sY;
+  const ry = -wx*_sY*_sX + wy*_cX + wz*_cY*_sX;
+  const rz = -wx*_sY*_cX - wy*_sX + wz*_cY*_cX;
+  return { px: W*0.5+rx*scale, py: H*0.5-ry*scale, depth: rz };
+}
+
+function renderSurface() {
+  const W = surfCanvas.width, H = surfCanvas.height;
+  if (W === 0 || H === 0) return;
+
+  const cm    = document.getElementById('colormapSel').value;
+  const lut   = getLUT(cm);
+  const scale = Math.min(W,H) * 0.32 * surfZoom;
+  const zSc   = 0.55;
+
+  _cY=Math.cos(surfRotY); _sY=Math.sin(surfRotY);
+  _cX=Math.cos(surfRotX); _sX=Math.sin(surfRotX);
+
+  surfCtx.fillStyle = '#f5f4f0';
+  surfCtx.fillRect(0, 0, W, H);
+
+  const hasNet = showNet;
+  const hasImg = showImg && imgGrid !== null;
+
+  if (!hasNet && !hasImg) {
+    drawAxes3D(W, H, scale);
+    if (showXOR) drawXORPoints(W, H, scale);
+    return;
+  }
+
+  // Project all N×N grid points
+  const ptsNet = hasNet ? new Array(N*N) : null;
+  const ptsImg = hasImg ? new Array(N*N) : null;
+
+  for (let iy = 0; iy < N; iy++) {
+    const wy = (iy / GRID) * 2 - 1;
+    for (let ix = 0; ix < N; ix++) {
+      const wx = (ix / GRID) * 2 - 1;
+      const idx = iy * N + ix;
+      if (hasNet) {
+        const wz = gridNorm[idx] * zSc - zSc*0.5;
+        ptsNet[idx] = project(wx, wz, wy, W, H, scale);
+      }
+      if (hasImg) {
+        const wz = imgGrid[idx] * zSc - zSc*0.5;
+        ptsImg[idx] = project(wx, wz, wy, W, H, scale);
+      }
+    }
+  }
+
+  // Build quads for each active surface
+  const surfaces = [];
+  if (hasNet) surfaces.push({ pts: ptsNet, qn: quadNorm, alpha: hasImg ? 0.7 : 1.0 });
+  if (hasImg) surfaces.push({ pts: ptsImg, qn: imgQuadNorm, alpha: hasNet ? 0.6 : 1.0 });
+
+  const allQuads = [];
+  for (const surf of surfaces) {
+    for (let iy = 0; iy < GRID; iy++) {
+      for (let ix = 0; ix < GRID; ix++) {
+        const p00=surf.pts[iy*N+ix], p10=surf.pts[iy*N+ix+1];
+        const p01=surf.pts[(iy+1)*N+ix], p11=surf.pts[(iy+1)*N+ix+1];
+        allQuads.push({
+          p00, p10, p11, p01,
+          depth: (p00.depth+p10.depth+p01.depth+p11.depth)*0.25,
+          t: surf.qn[iy*GRID+ix],
+          alpha: surf.alpha,
+        });
+      }
+    }
+  }
+
+  allQuads.sort((a, b) => a.depth - b.depth);
+
+  for (const q of allQuads) {
+    const ci = Math.round(Math.max(0,Math.min(1,q.t)) * 255) * 3;
+    const r=lut[ci], g=lut[ci+1], b=lut[ci+2];
+    surfCtx.fillStyle   = q.alpha < 1 ? `rgba(${r},${g},${b},${q.alpha})` : `rgb(${r},${g},${b})`;
+    surfCtx.strokeStyle = `rgba(0,0,0,${0.05 * q.alpha})`;
+    surfCtx.lineWidth   = 0.4;
+    surfCtx.beginPath();
+    surfCtx.moveTo(q.p00.px, q.p00.py);
+    surfCtx.lineTo(q.p10.px, q.p10.py);
+    surfCtx.lineTo(q.p11.px, q.p11.py);
+    surfCtx.lineTo(q.p01.px, q.p01.py);
+    surfCtx.closePath();
+    surfCtx.fill();
+    surfCtx.stroke();
+  }
+
+  drawAxes3D(W, H, scale);
+  if (showXOR) drawXORPoints(W, H, scale);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// XOR POINTS
+// ═══════════════════════════════════════════════════════════════
+const XOR_PTS = [
+  { wx: 0,       wz: 0,       label: 0 },  // (0,0)→0
+  { wx: 0,       wz: 1/RANGE, label: 1 },  // (0,1)→1
+  { wx: 1/RANGE, wz: 0,       label: 1 },  // (1,0)→1
+  { wx: 1/RANGE, wz: 1/RANGE, label: 0 },  // (1,1)→0
+];
+
+function drawXORPoints(W, H, scale) {
+  const zSc  = 0.55, baseY = -zSc * 0.5;
+  const span = (gridMax - gridMin) || 1e-9;
+
+  for (const pt of XOR_PTS) {
+    // pt.wx / pt.wz are world coords in [-1,1]; convert to grid index
+    // world → data: data = wx * RANGE
+    // world → grid index: ix = (wx + 1) / 2 * GRID
+    const ix = Math.max(0, Math.min(GRID, Math.round((pt.wx + 1) / 2 * GRID)));
+    const iy = Math.max(0, Math.min(GRID, Math.round((pt.wz + 1) / 2 * GRID)));
+
+    // Height of the network surface at this point (already normalized)
+    const surfNorm = gridNorm[iy * N + ix];
+    const surfWy   = surfNorm * zSc + baseY;
+
+    // Height of the true label — must use the SAME normalization as the surface
+    // so that label=0 sits at gridMin and label=1 sits at gridMax on the z axis
+    const trueNorm = (pt.label - gridMin) / span;
+    const trueWy   = trueNorm * zSc + baseY;
+
+    const surfPt  = project(pt.wx, surfWy, pt.wz, W, H, scale);
+    const truePt  = project(pt.wx, trueWy, pt.wz, W, H, scale);
+    const floorPt = project(pt.wx, baseY,  pt.wz, W, H, scale);
+    const col = pt.label === 1 ? 'rgba(37,99,235,.9)' : 'rgba(210,50,50,.9)';
+
+    // Dashed line from floor to true label height
+    surfCtx.setLineDash([3, 3]);
+    surfCtx.strokeStyle = col; surfCtx.lineWidth = 1;
+    surfCtx.beginPath(); surfCtx.moveTo(floorPt.px, floorPt.py); surfCtx.lineTo(truePt.px, truePt.py); surfCtx.stroke();
+    surfCtx.setLineDash([]);
+
+    // Hollow dot on the actual network surface
+    surfCtx.beginPath(); surfCtx.arc(surfPt.px, surfPt.py, 4, 0, Math.PI * 2);
+    surfCtx.fillStyle = 'rgba(255,255,255,.7)'; surfCtx.fill();
+    surfCtx.strokeStyle = col; surfCtx.lineWidth = 1.5; surfCtx.stroke();
+
+    // Solid dot at the true label height
+    surfCtx.beginPath(); surfCtx.arc(truePt.px, truePt.py, 5, 0, Math.PI * 2);
+    surfCtx.fillStyle = col; surfCtx.fill();
+    surfCtx.strokeStyle = 'white'; surfCtx.lineWidth = 1.5; surfCtx.stroke();
+
+    // Label
+    surfCtx.fillStyle = col;
+    surfCtx.font = 'bold 9px IBM Plex Mono';
+    surfCtx.textAlign = 'center'; surfCtx.textBaseline = 'bottom';
+    surfCtx.fillText(`(${pt.wx===0?0:1},${pt.wz===0?0:1})=${pt.label}`, truePt.px, truePt.py - 8);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AXES
+// ═══════════════════════════════════════════════════════════════
+function drawAxis(ctx, from, to, color, label) {
+  ctx.beginPath(); ctx.moveTo(from.px,from.py); ctx.lineTo(to.px,to.py);
+  ctx.strokeStyle=color; ctx.lineWidth=1.8; ctx.stroke();
+  const dx=to.px-from.px, dy=to.py-from.py, len=Math.hypot(dx,dy);
+  if (len < 2) return;
+  const nx=dx/len, ny=dy/len;
+  ctx.beginPath(); ctx.moveTo(to.px,to.py);
+  ctx.lineTo(to.px-nx*7-ny*4, to.py-ny*7+nx*4);
+  ctx.lineTo(to.px-nx*7+ny*4, to.py-ny*7-nx*4);
+  ctx.closePath(); ctx.fillStyle=color; ctx.fill();
+  ctx.fillStyle=color; ctx.font='bold 11px IBM Plex Mono';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(label, to.px+nx*14, to.py+ny*14);
+}
+
+function drawAxes3D(W, H, scale) {
+  const zSc   = 0.55;
+  const baseY = -zSc * 0.5;   // floor level (f=min)
+  const topY  = baseY + zSc;  // ceiling (f=max)
+
+  // ── Place origin at the front-left corner of the surface ──
+  // Surface spans world [-1,1]² in x and z.
+  // We pick the corner that will read as "bottom-left" after rotation.
+  const ox = -1, oz = -1;
+
+  const orig = project(ox, baseY, oz, W, H, scale);
+
+  // x axis: runs along z=oz bottom edge, world x: -1 → 1 (data -3 → 3), extend slightly
+  const xEnd = project(1.15, baseY, oz, W, H, scale);
+  // y (depth) axis: runs along x=ox bottom edge, world z: -1 → 1
+  const yEnd = project(ox, baseY, 1.15, W, H, scale);
+  // f(x,y) (vertical) axis: runs up from origin
+  const fEnd = project(ox, topY + 0.1*zSc, oz, W, H, scale);
+
+  drawAxis(surfCtx, orig, xEnd, 'rgba(210,50,50,.9)',   'x');
+  drawAxis(surfCtx, orig, yEnd, 'rgba(40,120,210,.9)',  'y');
+  drawAxis(surfCtx, orig, fEnd, 'rgba(30,160,70,.9)',   'f(x,y)');
+
+  // ── Ticks on x axis: data values -3,-1,1,3 → world -1,-0.33,0.33,1 ──
+  surfCtx.font = '8px IBM Plex Mono';
+  surfCtx.textBaseline = 'top';
+  const xTickData = [-3, -1, 1, 3];
+  for (const d of xTickData) {
+    const wx = d / RANGE;  // world x: data / RANGE
+    const p  = project(wx, baseY, oz, W, H, scale);
+    surfCtx.beginPath(); surfCtx.arc(p.px, p.py, 2, 0, Math.PI*2);
+    surfCtx.fillStyle = 'rgba(210,50,50,.8)'; surfCtx.fill();
+    surfCtx.fillStyle = 'rgba(0,0,0,.5)';
+    surfCtx.textAlign = 'center';
+    surfCtx.fillText(d, p.px, p.py + 4);
+  }
+
+  // ── Ticks on y axis: same data values ──
+  surfCtx.textBaseline = 'middle';
+  const yTickData = [-3, -1, 1, 3];
+  for (const d of yTickData) {
+    const wz = d / RANGE;
+    const p  = project(ox, baseY, wz, W, H, scale);
+    surfCtx.beginPath(); surfCtx.arc(p.px, p.py, 2, 0, Math.PI*2);
+    surfCtx.fillStyle = 'rgba(40,120,210,.8)'; surfCtx.fill();
+    surfCtx.fillStyle = 'rgba(0,0,0,.5)';
+    surfCtx.textAlign = 'right';
+    surfCtx.fillText(d, p.px - 4, p.py);
+  }
+
+  // ── f(x,y) axis: show min and max values ──
+  surfCtx.fillStyle = 'rgba(30,160,70,.85)';
+  surfCtx.font = '8px IBM Plex Mono';
+  surfCtx.textAlign = 'right';
+  surfCtx.textBaseline = 'middle';
+  const fTop = project(ox, topY, oz, W, H, scale);
+  const fBot = project(ox, baseY, oz, W, H, scale);
+  surfCtx.fillText(gridMax.toFixed(2), fTop.px - 4, fTop.py);
+  surfCtx.fillText(gridMin.toFixed(2), fBot.px - 4, fBot.py + 10);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// NETWORK DIAGRAM
+// ═══════════════════════════════════════════════════════════════
+let netNodePos = []; // netNodePos[l][j] = {x, y} — used for hover highlight
+
+function renderNetDiagram() {
+  const W=netDiagram.width, H=netDiagram.height;
+  if (W===0||H===0) return;
+  netCtx.clearRect(0,0,W,H); netCtx.fillStyle='#fff'; netCtx.fillRect(0,0,W,H);
+
+  const a=archSizes(), L=a.length;
+  const padX=16, padY=12, useW=W-padX*2, useH=H-padY*2-12;
+  const xs=a.map((_,i)=>padX+(i/(L-1))*useW);
+  const maxN=Math.max(...a);
+  const ys=a.map(size=>{
+    const sp=Math.min(useH/maxN,15);
+    const tot=(size-1)*sp;
+    return Array.from({length:size},(_,j)=>padY+useH*0.5-tot*0.5+j*sp);
+  });
+  const R=4;
+
+  // Store positions for hover hit-testing
+  netNodePos = a.map((size,l) => Array.from({length:size},(_,j)=>({x:xs[l],y:ys[l][j]})));
+
+  for (let l=0;l<L-1;l++) {
+    if (!net.weights[l]) continue;
+    for (let j=0;j<a[l+1];j++) {
+      for (let k=0;k<a[l];k++) {
+        const w=net.weights[l][j][k];
+        const alpha=Math.min(0.08+Math.abs(w)/3*0.5,0.6);
+        netCtx.strokeStyle=w>0?`rgba(37,99,235,${alpha})`:`rgba(220,60,60,${alpha})`;
+        netCtx.lineWidth=0.8;
+        netCtx.beginPath(); netCtx.moveTo(xs[l],ys[l][k]); netCtx.lineTo(xs[l+1],ys[l+1][j]); netCtx.stroke();
+      }
+    }
+  }
+  for (let l=0;l<L;l++) {
+    const col=l===0?'#2563eb':l===L-1?'#16a34a':'#64748b';
+    for (let i=0;i<a[l];i++) {
+      // Glow for hovered neuron
+      if (hoveredNeuron && hoveredNeuron.l===l && hoveredNeuron.j===i) {
+        netCtx.save();
+        netCtx.shadowColor='#f59e0b'; netCtx.shadowBlur=10;
+        netCtx.beginPath(); netCtx.arc(xs[l],ys[l][i],R+3,0,Math.PI*2);
+        netCtx.fillStyle='#f59e0b'; netCtx.fill();
+        netCtx.restore();
+      }
+      netCtx.beginPath(); netCtx.arc(xs[l],ys[l][i],R,0,Math.PI*2);
+      netCtx.fillStyle='#fff'; netCtx.fill();
+      netCtx.strokeStyle=col; netCtx.lineWidth=1.5; netCtx.stroke();
+    }
+  }
+  netCtx.font='bold 7px IBM Plex Mono'; netCtx.textAlign='center'; netCtx.textBaseline='middle';
+  ['x','y'].forEach((lb,i)=>{ netCtx.fillStyle='#2563eb'; netCtx.fillText(lb,xs[0],ys[0][i]); });
+  netCtx.fillStyle='#16a34a'; netCtx.fillText('f',xs[L-1],ys[L-1][0]);
+  netCtx.font='8px IBM Plex Mono'; netCtx.textBaseline='alphabetic';
+  for (let l=0;l<L;l++) {
+    const label=l===0?'in(2)':l===L-1?'out':`${a[l]}n`;
+    const col=l===0?'#2563eb':l===L-1?'#16a34a':'#94a3b8';
+    netCtx.fillStyle=col; netCtx.textAlign='center'; netCtx.fillText(label,xs[l],H-2);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TRAINING  — Adam optimizer, mini-batching, gradient clipping
+// ═══════════════════════════════════════════════════════════════
+let isTraining = false;
+let epoch      = 0;
+let lastLoss   = null;
+let bestLoss   = Infinity;
+let trainRafId = null;
+
+let _arch = [];
+let _W=[], _B=[];          // weights / biases (Float32Array)
+let _dW=[], _dB=[];        // gradient accumulators
+let _mW=[], _vW=[];        // Adam 1st/2nd moment for weights
+let _mB=[], _vB=[];        // Adam 1st/2nd moment for biases
+let _A=[], _Z=[], _D=[];   // activations, pre-acts, deltas
+let _adamT = 0;            // Adam timestep
+
+let _dsX=null, _dsY=null, _dsZ=null, _dsN=0;
+let _shuffleIdx = null;    // index array for mini-batch shuffling
+
+// ── Loss history for sparkline ──
+const LOSS_HISTORY = 120;
+const lossHistory = new Float32Array(LOSS_HISTORY);
+let lossHistHead = 0, lossHistCount = 0;
+
+// ── Steps/sec tracking ──
+let _stepsThisSec = 0, _lastSecTime = 0, _displayedSPS = 0;
+
+function allocTrainBuffers() {
+  _arch = archSizes();
+  const L = _arch.length - 1;
+  _W=[]; _B=[]; _dW=[]; _dB=[]; _mW=[]; _vW=[]; _mB=[]; _vB=[];
+  _A=[]; _Z=[]; _D=[];
+  _adamT = 0;
+  _A.push(new Float32Array(_arch[0]));
+  for (let l = 0; l < L; l++) {
+    const fi = _arch[l], fo = _arch[l+1];
+    _W.push(new Float32Array(fo * fi));
+    _B.push(new Float32Array(fo));
+    _dW.push(new Float32Array(fo * fi));
+    _dB.push(new Float32Array(fo));
+    _mW.push(new Float32Array(fo * fi));
+    _vW.push(new Float32Array(fo * fi));
+    _mB.push(new Float32Array(fo));
+    _vB.push(new Float32Array(fo));
+    _A.push(new Float32Array(fo));
+    _Z.push(new Float32Array(fo));
+    _D.push(new Float32Array(fo));
+  }
+}
+
+function netToFlat() {
+  const L = _arch.length - 1;
+  for (let l = 0; l < L; l++) {
+    const fi = _arch[l], fo = _arch[l+1];
+    for (let j = 0; j < fo; j++) {
+      _B[l][j] = net.biases[l][j];
+      for (let k = 0; k < fi; k++) _W[l][j*fi+k] = net.weights[l][j][k];
+    }
+  }
+}
+
+function flatToNet() {
+  const L = _arch.length - 1;
+  for (let l = 0; l < L; l++) {
+    const fi = _arch[l], fo = _arch[l+1];
+    for (let j = 0; j < fo; j++) {
+      net.biases[l][j] = _B[l][j];
+      for (let k = 0; k < fi; k++) net.weights[l][j][k] = _W[l][j*fi+k];
+    }
+  }
+}
+
+function buildDatasetArrays() {
+  const target = document.getElementById('trainTargetSel').value;
+  if (target === 'xor') {
+    _dsX = new Float32Array([0, 0, 1, 1]);
+    _dsY = new Float32Array([0, 1, 0, 1]);
+    _dsZ = new Float32Array([0, 1, 1, 0]);
+    _dsN = 4;
+  } else {
+    if (!imgGrid) return false;
+    _dsN = N * N;
+    _dsX = new Float32Array(_dsN);
+    _dsY = new Float32Array(_dsN);
+    _dsZ = new Float32Array(_dsN);
+    let idx = 0;
+    for (let iy = 0; iy < N; iy++) {
+      const y = (iy/GRID)*(RANGE*2) - RANGE;
+      for (let ix = 0; ix < N; ix++) {
+        _dsX[idx] = (ix/GRID)*(RANGE*2) - RANGE;
+        _dsY[idx] = y;
+        _dsZ[idx] = imgGrid[iy*N+ix];
+        idx++;
+      }
+    }
+  }
+  // Shuffle index array
+  _shuffleIdx = new Int32Array(_dsN);
+  for (let i = 0; i < _dsN; i++) _shuffleIdx[i] = i;
+  return true;
+}
+
+// Fisher-Yates shuffle of _shuffleIdx
+function shuffleDataset() {
+  for (let i = _dsN - 1; i > 0; i--) {
+    const j = Math.random() * (i+1) | 0;
+    const tmp = _shuffleIdx[i]; _shuffleIdx[i] = _shuffleIdx[j]; _shuffleIdx[j] = tmp;
+  }
+}
+
+function _act(v) {
+  if (net.activation === 'custom' && customActFn) return customActFn(v);
+  switch (net.activation) {
+    case 'relu':    return v > 0 ? v : 0;
+    case 'tanh':    return Math.tanh(v);
+    case 'sigmoid': return 1/(1+Math.exp(-v));
+    case 'sin':     return Math.sin(v);
+    default:        return v;
+  }
+}
+function _actD(v, av) {
+  if (net.activation === 'custom' && customActFn) {
+    const h = 1e-4;
+    return (customActFn(v + h) - customActFn(v - h)) / (2 * h);
+  }
+  switch (net.activation) {
+    case 'relu':    return v > 0 ? 1 : 0;
+    case 'tanh':    return 1 - av*av;
+    case 'sigmoid': return av*(1-av);
+    case 'sin':     return Math.cos(v);
+    default:        return 1;
+  }
+}
+
+// One full pass over a batch [start, end) — accumulates grads, returns loss sum
+function forwardBackwardBatch(start, end) {
+  const L = _arch.length - 1;
+  let loss = 0;
+  for (let l = 0; l < L; l++) { _dW[l].fill(0); _dB[l].fill(0); }
+
+  for (let si = start; si < end; si++) {
+    const s = _shuffleIdx[si];
+    _A[0][0] = _dsX[s]; _A[0][1] = _dsY[s];
+
+    // Forward
+    for (let l = 0; l < L; l++) {
+      const fi=_arch[l], fo=_arch[l+1], isLast=l===L-1;
+      const Wl=_W[l], Bl=_B[l], Al=_A[l], Al1=_A[l+1], Zl=_Z[l];
+      for (let j = 0; j < fo; j++) {
+        let z = Bl[j], base=j*fi;
+        for (let k = 0; k < fi; k++) z += Wl[base+k]*Al[k];
+        Zl[j]=z; Al1[j]=isLast?z:_act(z);
+      }
+    }
+
+    // Loss (MSE)
+    const err = _A[L][0] - _dsZ[s];
+    loss += err*err;
+
+    // Backward
+    _D[L-1][0] = err; // dL/dout = (out-target), output is linear
+    for (let l = L-2; l >= 0; l--) {
+      const fo1=_arch[l+2], fo=_arch[l+1];
+      const Wl1=_W[l+1], Dl=_D[l], Dl1=_D[l+1], Zl=_Z[l], Al1=_A[l+1];
+      _D[l].fill(0);
+      for (let j = 0; j < fo1; j++) {
+        const dj=Dl1[j], base=j*fo;
+        for (let k = 0; k < fo; k++) Dl[k] += Wl1[base+k]*dj;
+      }
+      for (let k = 0; k < fo; k++) Dl[k] *= _actD(Zl[k], Al1[k]);
+    }
+
+    // Accumulate gradients
+    for (let l = 0; l < L; l++) {
+      const fi=_arch[l], fo=_arch[l+1];
+      const Al=_A[l], Dl=_D[l], dWl=_dW[l], dBl=_dB[l];
+      for (let j = 0; j < fo; j++) {
+        const dj=Dl[j]; dBl[j]+=dj;
+        const base=j*fi;
+        for (let k = 0; k < fi; k++) dWl[base+k]+=dj*Al[k];
+      }
+    }
+  }
+  return loss;
+}
+
+// Apply gradients — Adam or SGD+momentum
+function applyGradients(batchSize) {
+  const L   = _arch.length - 1;
+  const lr  = parseFloat(document.getElementById('lrSel').value);
+  const opt = document.getElementById('optimSel').value;
+  const n   = batchSize;
+  const CLIP = 5.0; // gradient clipping threshold
+
+  if (opt === 'adam') {
+    const b1=0.9, b2=0.999, eps=1e-8;
+    _adamT++;
+    const bc1 = 1 - Math.pow(b1, _adamT);
+    const bc2 = 1 - Math.pow(b2, _adamT);
+    for (let l = 0; l < L; l++) {
+      const len=_W[l].length;
+      for (let i = 0; i < len; i++) {
+        let g = _dW[l][i]/n;
+        if (g >  CLIP) g =  CLIP;  // gradient clipping
+        if (g < -CLIP) g = -CLIP;
+        _mW[l][i] = b1*_mW[l][i] + (1-b1)*g;
+        _vW[l][i] = b2*_vW[l][i] + (1-b2)*g*g;
+        _W[l][i] -= lr * (_mW[l][i]/bc1) / (Math.sqrt(_vW[l][i]/bc2)+eps);
+      }
+      const blen=_B[l].length;
+      for (let i = 0; i < blen; i++) {
+        let g = _dB[l][i]/n;
+        if (g >  CLIP) g =  CLIP;
+        if (g < -CLIP) g = -CLIP;
+        _mB[l][i] = b1*_mB[l][i] + (1-b1)*g;
+        _vB[l][i] = b2*_vB[l][i] + (1-b2)*g*g;
+        _B[l][i] -= lr * (_mB[l][i]/bc1) / (Math.sqrt(_vB[l][i]/bc2)+eps);
+      }
+    }
+  } else {
+    // SGD plain
+    for (let l = 0; l < L; l++) {
+      const scale = lr/n;
+      const len=_W[l].length;
+      for (let i=0;i<len;i++) {
+        let g=_dW[l][i]*scale;
+        if (g >  CLIP*lr) g =  CLIP*lr;
+        if (g < -CLIP*lr) g = -CLIP*lr;
+        _W[l][i]-=g;
+      }
+      const blen=_B[l].length;
+      for (let i=0;i<blen;i++) {
+        let g=_dB[l][i]*scale;
+        if (g >  CLIP*lr) g =  CLIP*lr;
+        if (g < -CLIP*lr) g = -CLIP*lr;
+        _B[l][i]-=g;
+      }
+    }
+  }
+}
+
+// One full epoch (potentially multiple mini-batches)
+function runEpoch() {
+  const batchSel = document.getElementById('batchSel').value;
+  const batchSize = batchSel === 'full' ? _dsN : Math.min(parseInt(batchSel), _dsN);
+
+  shuffleDataset();
+
+  let loss = 0, batches = 0;
+  for (let start = 0; start < _dsN; start += batchSize) {
+    const end = Math.min(start + batchSize, _dsN);
+    const bs  = end - start;
+    loss += forwardBackwardBatch(start, end);
+    applyGradients(bs);
+    batches++;
+  }
+
+  epoch++;
+  _stepsThisSec++;
+  return loss / _dsN;
+}
+
+// ── Loss sparkline ──
+function pushLoss(v) {
+  lossHistory[lossHistHead] = v;
+  lossHistHead = (lossHistHead + 1) % LOSS_HISTORY;
+  if (lossHistCount < LOSS_HISTORY) lossHistCount++;
+}
+
+function renderLossChart() {
+  const canvas = document.getElementById('lossChart');
+  const W = canvas.width = canvas.offsetWidth;
+  const H = canvas.height = 36;
+  if (lossHistCount < 2) return;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#f5f4f0'; ctx.fillRect(0,0,W,H);
+
+  let mn=Infinity, mx=0;
+  for (let i=0;i<lossHistCount;i++) {
+    const v=lossHistory[(lossHistHead-lossHistCount+i+LOSS_HISTORY)%LOSS_HISTORY];
+    if(v<mn) mn=v; if(v>mx) mx=v;
+  }
+  const span=mx-mn||1e-9;
+
+  ctx.beginPath();
+  ctx.strokeStyle='#2563eb'; ctx.lineWidth=1.5;
+  for (let i=0;i<lossHistCount;i++) {
+    const v=lossHistory[(lossHistHead-lossHistCount+i+LOSS_HISTORY)%LOSS_HISTORY];
+    const x=i/(lossHistCount-1)*W;
+    const y=H-4-(v-mn)/span*(H-8);
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+
+  // Gradient fill
+  const grad=ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,'rgba(37,99,235,.2)');
+  grad.addColorStop(1,'rgba(37,99,235,0)');
+  ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.closePath();
+  ctx.fillStyle=grad; ctx.fill();
+
+  // Min/max labels
+  ctx.fillStyle='rgba(0,0,0,.35)'; ctx.font='7px IBM Plex Mono';
+  ctx.textAlign='right';
+  ctx.fillText(mx.toFixed(4),W-2,9);
+  ctx.fillText(mn.toFixed(4),W-2,H-2);
+}
+
+// ── Training loop ──
+function trainLoop() {
+  if (!isTraining) return;
+
+  const t0 = performance.now();
+
+  // Run epochs for up to 20ms budget (leaves headroom for render)
+  do {
+    lastLoss = runEpoch();
+  } while (performance.now() - t0 < 20);
+
+  if (lastLoss < bestLoss) bestLoss = lastLoss;
+  pushLoss(lastLoss);
+
+  // Steps/sec update
+  const now = performance.now();
+  if (now - _lastSecTime >= 1000) {
+    _displayedSPS = Math.round(_stepsThisSec * 1000 / (now - _lastSecTime));
+    _stepsThisSec = 0; _lastSecTime = now;
+  }
+
+  flatToNet();
+  neuronGridsDirty = true;
+  updateEval();
+  document.getElementById('epochSpan').textContent  = epoch;
+  document.getElementById('lossSpan').textContent   = lastLoss.toExponential(3);
+  document.getElementById('bestLossSpan').textContent = bestLoss.toExponential(3);
+  document.getElementById('stepsSecSpan').textContent = _displayedSPS ? `${_displayedSPS} ep/s` : '';
+
+  renderLossChart();
+  if (epoch % 50 === 0) buildWeightSliders();
+  scheduleRedraw(true);
+
+  trainRafId = requestAnimationFrame(trainLoop);
+}
+
+function startTraining() {
+  if (isTraining) return;
+  allocTrainBuffers();
+  netToFlat();
+  if (!buildDatasetArrays()) {
+    alert('Upload an image or select XOR as target.');
+    return;
+  }
+  _lastSecTime = performance.now(); _stepsThisSec = 0;
+  isTraining = true;
+  document.getElementById('trainBtn').textContent = '⏸ Pause';
+  trainRafId = requestAnimationFrame(trainLoop);
+}
+
+function stopTraining() {
+  if (!isTraining) return;
+  isTraining = false;
+  if (trainRafId) { cancelAnimationFrame(trainRafId); trainRafId = null; }
+  document.getElementById('trainBtn').textContent = '▶ Train';
+}
+
+function doSingleStep() {
+  stopTraining();
+  allocTrainBuffers();
+  netToFlat();
+  if (!buildDatasetArrays()) {
+    alert('Upload an image or select XOR as target.');
+    return;
+  }
+  lastLoss = runEpoch();
+  if (lastLoss < bestLoss) bestLoss = lastLoss;
+  pushLoss(lastLoss);
+  flatToNet();
+  document.getElementById('epochSpan').textContent    = epoch;
+  document.getElementById('lossSpan').textContent     = lastLoss.toExponential(3);
+  document.getElementById('bestLossSpan').textContent = bestLoss.toExponential(3);
+  renderLossChart();
+  buildWeightSliders();
+  scheduleRedraw(true);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RENDER PIPELINE
+// ═══════════════════════════════════════════════════════════════
+let rafPending = false, gridDirty = true;
+
+function scheduleRedraw(invalidateGrid) {
+  if (invalidateGrid) { gridDirty = true; neuronGridsDirty = true; }
+  if (!rafPending) { rafPending = true; requestAnimationFrame(renderAll); }
+}
+
+function renderAll() {
+  rafPending = false;
+  if (gridDirty) { computeGrid(); gridDirty = false; }
+  if (activeView === 'function') {
+    renderColormap();
+    renderSurface();
+  } else {
+    if (neuronGridsDirty) computeNeuronGrids();
+    renderNeuronsView();
+  }
+  renderNetDiagram();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UI
+// ═══════════════════════════════════════════════════════════════
+function buildLayerList() {
+  const list = document.getElementById('layerList');
+  list.innerHTML = '';
+  net.layers.forEach((size, i) => {
+    const row = document.createElement('div'); row.className='layer-row';
+    const name = document.createElement('div'); name.className='layer-name';
+    name.innerHTML=`Hidden ${i+1}`;
+
+    // Direct number input — no arbitrary cap
+    const inp = document.createElement('input');
+    inp.type='number'; inp.min=1; inp.max=512; inp.value=size;
+    inp.style.cssText='width:48px;font-family:var(--mono);font-size:11px;font-weight:500;color:var(--accent);border:1px solid var(--border);border-radius:3px;padding:2px 4px;background:var(--bg);text-align:center;';
+    inp.addEventListener('change', () => {
+      const v = Math.max(1, Math.min(512, parseInt(inp.value)||1));
+      inp.value = v;
+      net.layers[i] = v;
+      rebuild();
+    });
+
+    const del=document.createElement('button'); del.className='del-btn'; del.textContent='×';
+    del.onclick=()=>{ if(net.layers.length>1){ net.layers.splice(i,1); rebuild(); } };
+
+    row.appendChild(name); row.appendChild(inp); row.appendChild(del);
+    list.appendChild(row);
+  });
+  const a=archSizes();
+  document.getElementById('archDisplay').innerHTML=a.map(n=>`<span>${n}</span>`).join(' → ');
+}
+
+function buildWeightSliders() {
+  const container=document.getElementById('weightSliders');
+  container.innerHTML='';
+  const names=['Input',...net.layers.map((_,i)=>`H${i+1}`),'Out'];
+  for (let l=0;l<net.weights.length;l++) {
+    const g=document.createElement('div'); g.className='weight-group';
+    g.innerHTML=`<div class="weight-group-title">${names[l]} → ${names[l+1]}</div>`;
+    for (let j=0;j<net.biases[l].length;j++) {
+      const tn=l===net.weights.length-1?'f':`n${j}`;
+      addSlider(g,`b[${tn}]`,net.biases[l][j],-3,3,v=>{net.biases[l][j]=v;scheduleRedraw(true);});
+    }
+    for (let j=0;j<net.weights[l].length;j++) {
+      for (let k=0;k<net.weights[l][j].length;k++) {
+        const fn=l===0?['x','y'][k]:`n${k}`;
+        const tn=l===net.weights.length-1?'f':`n${j}`;
+        addSlider(g,`${fn}→${tn}`,net.weights[l][j][k],-5,5,v=>{net.weights[l][j][k]=v;scheduleRedraw(true);});
+      }
+    }
+    container.appendChild(g);
+  }
+}
+
+function addSlider(container, label, value, min, max, onChange) {
+  const row=document.createElement('div'); row.className='weight-item';
+  const lbl=document.createElement('div'); lbl.className='weight-name'; lbl.title=label; lbl.textContent=label;
+  const wrap=document.createElement('div'); wrap.className='weight-slider-wrap';
+  const sl=document.createElement('input'); sl.type='range'; sl.min=min; sl.max=max; sl.step=0.01; sl.value=value;
+  const val=document.createElement('div'); val.className='weight-val'; val.textContent=(+value).toFixed(2);
+  sl.addEventListener('input',()=>{ const v=parseFloat(sl.value); val.textContent=v.toFixed(2); onChange(v); });
+  wrap.appendChild(sl);
+  row.appendChild(lbl); row.appendChild(wrap); row.appendChild(val);
+  container.appendChild(row);
+}
+
+function rebuild() {
+  stopTraining();
+  initWeights();
+  neuronGridsDirty = true;
+  buildLayerList();
+  buildWeightSliders();
+  epoch=0; lastLoss=null; bestLoss=Infinity;
+  lossHistHead=0; lossHistCount=0;
+  document.getElementById('epochSpan').textContent='0';
+  document.getElementById('lossSpan').textContent='—';
+  document.getElementById('bestLossSpan').textContent='—';
+  document.getElementById('stepsSecSpan').textContent='';
+  const lc=document.getElementById('lossChart');
+  const lctx=lc.getContext('2d'); lctx.clearRect(0,0,lc.width,lc.height);
+  scheduleRedraw(true);
+}
+
+function setToggle(btn, state) {
+  btn.textContent = state ? 'Show' : 'Hide';
+  // Actually: show = active state
+  btn.classList.toggle('off', !state);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EVENTS
+// ═══════════════════════════════════════════════════════════════
+document.getElementById('addLayerBtn').addEventListener('click', ()=>{ if(net.layers.length<6){ net.layers.push(3); rebuild(); } });
+
+// Activation selector — show/hide custom input row
+document.getElementById('activationSel').addEventListener('change', e => {
+  net.activation = e.target.value;
+  const isCustom = e.target.value === 'custom';
+  document.getElementById('customActRow').style.display = isCustom ? 'block' : 'none';
+  if (isCustom && !customActFn) {
+    // Compile the current input on first switch to custom
+    const formula = document.getElementById('customActInput').value.trim();
+    compileCustomAct(formula);
+  }
+  scheduleRedraw(true);
+});
+
+// Apply custom activation formula
+function applyCustomAct() {
+  const formula = document.getElementById('customActInput').value.trim();
+  const errEl   = document.getElementById('customActError');
+  const err = compileCustomAct(formula);
+  if (err) {
+    errEl.textContent = '⚠ ' + err;
+    errEl.style.display = 'block';
+  } else {
+    errEl.style.display = 'none';
+    net.activation = 'custom';
+    scheduleRedraw(true);
+  }
+}
+document.getElementById('applyActBtn').addEventListener('click', applyCustomAct);
+document.getElementById('customActInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') applyCustomAct();
+});
+
+// Eval toggle
+document.getElementById('showEvalBtn').addEventListener('click', () => {
+  showEval = !showEval;
+  const btn = document.getElementById('showEvalBtn');
+  btn.textContent = showEval ? 'Show' : 'Hide';
+  btn.classList.toggle('off', !showEval);
+  scheduleRedraw(false);
+});
+document.getElementById('colormapSel').addEventListener('change', ()=>{ scheduleRedraw(false); });
+document.getElementById('neuronColormapSel').addEventListener('change', ()=>{
+  if (activeView === 'neurons') renderNeuronsView();
+});
+
+// Tab switching
+document.getElementById('tabFunction').addEventListener('click', () => {
+  activeView = 'function';
+  document.getElementById('tabFunction').classList.add('active');
+  document.getElementById('tabNeurons').classList.remove('active');
+  document.getElementById('viewFunction').style.display = '';
+  document.getElementById('viewNeurons').style.display = 'none';
+  scheduleRedraw(false);
+});
+document.getElementById('tabNeurons').addEventListener('click', () => {
+  activeView = 'neurons';
+  document.getElementById('tabNeurons').classList.add('active');
+  document.getElementById('tabFunction').classList.remove('active');
+  document.getElementById('viewFunction').style.display = 'none';
+  document.getElementById('viewNeurons').style.display = '';
+  scheduleRedraw(false);
+});
+
+// Surface toggles
+document.getElementById('showNetBtn').addEventListener('click', ()=>{
+  showNet=!showNet;
+  const btn=document.getElementById('showNetBtn');
+  btn.textContent=showNet?'Show':'Hide';
+  btn.classList.toggle('off',!showNet);
+  scheduleRedraw(false);
+});
+document.getElementById('showImgBtn').addEventListener('click', ()=>{
+  if (!imgGrid) { alert('Upload an image first.'); return; }
+  showImg=!showImg;
+  const btn=document.getElementById('showImgBtn');
+  btn.textContent=showImg?'Show':'Hide';
+  btn.classList.toggle('off',!showImg);
+  scheduleRedraw(false);
+});
+document.getElementById('xorToggleBtn').addEventListener('click', ()=>{
+  showXOR=!showXOR;
+  const btn=document.getElementById('xorToggleBtn');
+  btn.textContent=showXOR?'Show':'Hide';
+  btn.classList.toggle('off',!showXOR);
+  scheduleRedraw(false);
+});
+
+// Eval inputs — update live on any change
+document.getElementById('evalX').addEventListener('input', updateEval);
+document.getElementById('evalY').addEventListener('input', updateEval);
+
+// Click colormap to set eval point
+cmapCanvas.addEventListener('click', e => {
+  const rect = cmapCanvas.getBoundingClientRect();
+  const W = cmapCanvas.width, H = cmapCanvas.height;
+  const mx = (e.clientX - rect.left) * (W / rect.width);
+  const my = (e.clientY - rect.top)  * (H / rect.height);
+
+  const availW = W - PAD * 2, availH = H - PAD * 2;
+  const S  = Math.min(availW, availH);
+  const x0 = Math.floor((W - S) / 2);
+  const y0 = Math.floor((H - S) / 2);
+
+  if (mx < x0 || mx > x0+S || my < y0 || my > y0+S) return;
+
+  const dx = ((mx - x0) / S) * (RANGE * 2) - RANGE;
+  const dy = (1 - (my - y0) / S) * (RANGE * 2) - RANGE;
+  const rx = Math.round(dx * 100) / 100;
+  const ry = Math.round(dy * 100) / 100;
+
+  document.getElementById('evalX').value = rx;
+  document.getElementById('evalY').value = ry;
+  updateEval();
+});
+
+// Also show pointer cursor over colormap
+cmapCanvas.style.cursor = 'crosshair';
+
+// Training buttons
+document.getElementById('trainBtn').addEventListener('click', ()=>{
+  if (isTraining) stopTraining(); else startTraining();
+});
+document.getElementById('stepBtn').addEventListener('click', doSingleStep);
+document.getElementById('resetTrainBtn').addEventListener('click', ()=>{ stopTraining(); rebuild(); });
+
+// Image upload
+document.getElementById('imgUpload').addEventListener('change', e=>{
+  const file=e.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const img=new Image();
+    img.onload=()=>{
+      const preview=document.getElementById('imgPreview');
+      preview.src=ev.target.result; preview.style.display='block';
+      document.getElementById('uploadLabel').textContent=file.name;
+      loadImageIntoGrid(img);
+      showImg=true;
+      const btn=document.getElementById('showImgBtn');
+      btn.textContent='Hide'; btn.classList.remove('off');
+      document.getElementById('trainTargetSel').value='image';
+      scheduleRedraw(false);
+    };
+    img.src=ev.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+const ro=new ResizeObserver(()=>{ resizeCanvases(); scheduleRedraw(false); });
+ro.observe(document.querySelector('.viz-area'));
+ro.observe(document.querySelector('.net-diagram-wrap'));
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+function init() {
+  ['viridis','plasma','coolwarm','grayscale'].forEach(buildLUT);
+  initWeights();
+  buildLayerList();
+  buildWeightSliders();
+  resizeCanvases();
+  computeGrid(); gridDirty=false;
+  updateEval();
+  renderColormap(); renderSurface(); renderNetDiagram();
+}
+
+// Validate JS before running
+setTimeout(init, 30);
+</script>
+</body>
+</html>
