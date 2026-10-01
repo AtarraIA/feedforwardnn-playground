@@ -255,7 +255,7 @@
 
   /* Function view: 2 panels side by side */
   #viewFunction {
-    flex: 1; display: grid; grid-template-columns: 1fr 1fr;
+    flex: 1; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr);
     overflow: hidden; min-height: 0;
   }
   #viewFunction .viz-panel:first-child { border-right: 1px solid var(--border); }
@@ -337,17 +337,35 @@
   #neuronModalClose:hover { color: var(--text); }
 
   /* ─── INSTAGRAM MODE (Ctrl+X) ─── */
-  /* 9:16 frame for screen-recording Reels; controls stay usable outside it */
-  body.ig-mode { background: #1a1a1a; }
-  body.ig-mode .viz-area {
-    --ig-h: min(calc(100vh - 24px), calc((100vw - 314px) * 16 / 9));
+  /* Whole app in a 9:16 frame for screen-recording Reels. The left panel
+     collapses into a top strip: title, network diagram and training stats. */
+  html.ig-mode { background: #1a1a1a; }
+  html.ig-mode body {
+    --ig-h: min(calc(100vh - 24px), calc((100vw - 24px) * 16 / 9));
     height: var(--ig-h); width: calc(var(--ig-h) * 9 / 16);
-    align-self: center; justify-self: center;
+    margin: 12px auto;
+    grid-template-columns: 1fr; grid-template-rows: auto 1fr;
     box-shadow: 0 0 0 1px rgba(255,255,255,.08);
   }
-  body.ig-mode .view-tabs { display: none; }
-  body.ig-mode #viewFunction { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
-  body.ig-mode #viewFunction .viz-panel:first-child { border-right: none; border-bottom: 1px solid var(--border); }
+  html.ig-mode .controls {
+    display: grid; grid-template-columns: 1fr 1fr;
+    border-right: none; border-bottom: 1px solid var(--border);
+  }
+  html.ig-mode .controls-header { grid-column: 1 / -1; padding: 12px 18px 10px; }
+  html.ig-mode .net-diagram-wrap {
+    border-bottom: none; border-right: 1px solid var(--border);
+    padding: 10px 18px; display: flex; align-items: center;
+  }
+  html.ig-mode .controls-body { overflow: visible; padding: 10px 18px; }
+  html.ig-mode .controls-body .section:not(.train-section),
+  html.ig-mode .train-section .section-title,
+  html.ig-mode .train-section .select-row { display: none; }
+  html.ig-mode .train-section { margin-bottom: 0; }
+  html.ig-mode .train-row { margin-bottom: 0; }
+  html.ig-mode .view-tabs { display: none; }
+  html.ig-mode .colorbar { right: 40px; }  /* keep tick labels inside the frame */
+  html.ig-mode #viewFunction { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+  html.ig-mode #viewFunction .viz-panel:first-child { border-right: none; border-bottom: 1px solid var(--border); }
 
   ::-webkit-scrollbar { width: 3px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -441,7 +459,7 @@
       <img id="imgPreview" alt="preview">
     </div>
 
-    <div class="section">
+    <div class="section train-section">
       <div class="section-title">Training</div>
       <div class="select-row">
         <label>Target</label>
@@ -977,10 +995,14 @@ const netCtx  = netDiagram.getContext('2d');
 function resizeCanvases() {
   [cmapCanvas, surfCanvas].forEach(c => {
     const r = c.getBoundingClientRect();
-    if (r.width > 0 && r.height > 0) { c.width = Math.round(r.width); c.height = Math.round(r.height); }
+    if (r.width > 0 && r.height > 0) {
+      const w = Math.round(r.width), h = Math.round(r.height);
+      if (c.width !== w) c.width = w;   // assigning clears the canvas, so skip no-ops
+      if (c.height !== h) c.height = h;
+    }
   });
   const nr = netDiagram.getBoundingClientRect();
-  if (nr.width > 0) netDiagram.width = Math.round(nr.width);
+  if (nr.width > 0 && netDiagram.width !== Math.round(nr.width)) netDiagram.width = Math.round(nr.width);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2150,15 +2172,14 @@ window.addEventListener('keydown', e => {
   if (!e.ctrlKey || e.metaKey || e.altKey || e.key.toLowerCase() !== 'x') return;
   if (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable]')) return; // keep normal cut
   e.preventDefault();
-  const on = document.body.classList.toggle('ig-mode');
+  const on = document.documentElement.classList.toggle('ig-mode');
   if (on && activeView !== 'function') document.getElementById('tabFunction').click();
+  requestAnimationFrame(renderLossChart); // its width changed with the layout
 });
 
 const ro=new ResizeObserver(()=>{ resizeCanvases(); scheduleRedraw(false); });
 ro.observe(document.querySelector('.viz-area'));
 ro.observe(document.querySelector('.net-diagram-wrap'));
-ro.observe(cmapCanvas);
-ro.observe(surfCanvas);
 
 // ═══════════════════════════════════════════════════════════════
 // INIT
